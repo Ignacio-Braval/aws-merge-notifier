@@ -1,20 +1,51 @@
 import json
 import boto3
 import os
+import hmac
+import hashlib
 
+# Variables de entorno
 STEP_FUNCTION_ARN = os.environ.get("STEP_FUNCTION_ARN")
 TARGET_BRANCH = "qa"
+GITHUB_WEBHOOK_SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET")
 
+# Cliente Step Functions
 client = boto3.client('stepfunctions')
+
+
+def verify_github_signature(event):
+    """
+    Verifica que la petición provenga realmente de GitHub usando el secreto.
+    """
+    signature = event['headers'].get('X-Hub-Signature-256')
+    if signature is None:
+        return False
+
+    sha_name, signature = signature.split('=')
+    mac = hmac.new(
+        bytes(GITHUB_WEBHOOK_SECRET, 'utf-8'),
+        msg=event['body'].encode('utf-8'),
+        digestmod=hashlib.sha256
+    )
+    return hmac.compare_digest(mac.hexdigest(), signature)
+
 
 def lambda_handler(event, context):
     """
     Lambda principal que recibe el evento de GitHub.
+    - Verifica la firma con el secreto
     - Verifica que sea un merge a la rama QA
     - Lanza la Step Function
     """
 
-    # GitHub envía el payload como JSON en body si es API Gateway
+    # Validar el secreto de GitHub
+    if not verify_github_signature(event):
+        return {
+            'statusCode': 403,
+            'body': json.dumps({'message': 'Invalid signature'})
+        }
+
+    # Parsear el payload enviado por GitHub
     try:
         body = json.loads(event.get("body", "{}"))
     except Exception as e:
@@ -23,8 +54,8 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": "Invalid payload", "error": str(e)})
         }
 
-    # Validar que el evento sea un merge
-    ref = body.get("ref")  # La rama del merge
+    # Validar que el evento sea un merge cerrado a TARGET_BRANCH
+    ref = body.get("ref")  # Rama de destino del merge
     action = body.get("action")  # 'closed' para PR cerrado
     merged = body.get("pull_request", {}).get("merged", False)
 
@@ -58,5 +89,7 @@ def lambda_handler(event, context):
     else:
         return {
             "statusCode": 200,
-            "body": json.dumps({"message": f"No se ejecuta Step Function. Merge no en {TARGET_BRANCH} o PR no cerrado/mergeado."})
+            "body": json.dumps({
+                "message": f"No se ejecuta Step Function. Merge no en {TARGET_BRANCH} o PR no cerrado/mergeado."
+            })
         }
