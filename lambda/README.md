@@ -1,6 +1,6 @@
 # Lambda GitHub Merge Trigger
 
-Esta Lambda recibe eventos de GitHub mediante un **Webhook** conectado a **API Gateway** y ejecuta una **Step Function** si se detecta un merge a la rama `qa`. Al final del flujo, se puede notificar mediante **SNS** u otros servicios integrados en la Step Function.
+Esta Lambda recibe eventos de GitHub mediante un **Webhook** conectado a **API Gateway** y ejecuta una **Step Function** si se detecta un merge a la rama `QA`. Al final del flujo, se puede notificar mediante **SNS** u otros servicios integrados en la Step Function.
 
 ---
 
