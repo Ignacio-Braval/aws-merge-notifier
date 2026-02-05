@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: GitHub Merge to QA Trigger using AWS Lambda and Step Functions
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+
+  GitHubMergeLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda/
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          STEP_FUNCTION_ARN: !Ref GitHubMergeStateMachine
+          GITHUB_WEBHOOK_SECRET: '{{resolve:ssm:/github/webhook/secret}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: "*"
+      Events:
+        GitHubWebhook:
+          Type: Api
+          Properties:
+            Path: /github/webhook
+            Method: POST
+
+  GitHubMergeStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: stepfunctions.json
+      RoleArn: !GetAtt StepFunctionsRole.Arn
+
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StepFunctionsBasicPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
