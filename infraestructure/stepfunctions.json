@@ -1,0 +1,16 @@
+{
+  "Comment": "Flujo para notificar merges exitosos desde GitHub",
+  "StartAt": "EnviarNotificacionSNS",
+  "States": {
+    "EnviarNotificacionSNS": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-2:TU_ID:MergeNotificationTopic",
+        "Message.$": "States.Format('Se detectó un merge exitoso en la rama {} del repositorio {} realizado por {}', $.branch, $.repository, $.merged_by)",
+        "Subject": "✅ Merge exitoso detectado desde GitHub"
+      },
+      "End": true
+    }
+  }
+}
